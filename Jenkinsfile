@@ -1,55 +1,32 @@
 pipeline {
-    environment {
-        imagename = "coacht/jenkinss"
-        dockerImage = ''
-        containerName = 'my-container'
-        dockerHubCredentials = 'project'
-    }
- 
     agent any
- 
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials-id')
+        GITHUB_REPO = 'https://github.com/devopscoacht/jenkins-project1.git'
+        IMAGE_NAME = 'devopscoacht/jenkins-project'
+    }
+
     stages {
-        stage('Cloning Git') {
+        stage('Checkout') {
             steps {
-                git([url: 'https://github.com/devopscoacht/jenkins-project1.git', branch: 'master'])
+                git branch: 'main',
+                    credentialsId: 'github',
+                    url: "${env.GITHUB_REPO}"
             }
         }
- 
-        stage('Building image') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    dockerImage = docker.build "${imagename}:latest"
+                    dockerImage = docker.build("${IMAGE_NAME}:${env.BUILD_NUMBER}")
                 }
             }
         }
- 
-        stage('Running image') {
+        stage('Push Docker Image') {
             steps {
                 script {
-                    sh "docker run -d --name ${containerName} ${imagename}:latest"
-                    // Perform any additional steps needed while the container is running
-                }
-            }
-        }
- 
-        stage('Stop and Remove Container') {
-            steps {
-                script {
-                    sh "docker stop ${containerName} || true"
-                    sh "docker rm ${containerName} || true"
-                }
-            }
-        }
- 
-        stage('Deploy Image') {
-            steps {
-                script {
-                    // Use Jenkins credentials for Docker Hub login
-                    withCredentials([usernamePassword(credentialsId: dockerHubCredentials, usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                        sh "docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD"
- 
-                        // Push the image
-                        sh "docker push ${imagename}:latest"
+                    docker.withRegistry('', "${DOCKERHUB_CREDENTIALS}") {
+                        dockerImage.push()
                     }
                 }
             }
