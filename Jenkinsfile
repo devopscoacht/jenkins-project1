@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        // Define all environment variables at pipeline level
         APP_NAME = 'fastapi-app'
         DOCKERHUB_USERNAME = 'devopscoacht'
         IMAGE_NAME = "${DOCKERHUB_USERNAME}/${APP_NAME}"
@@ -19,87 +18,61 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                script {
-                    cleanWs()
-                    checkout scm
-                }
+                cleanWs()
+                git branch: 'master',
+                    url: 'https://github.com/devopscoacht/jenkins-project1.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    try {
-                        sh """
-                            docker build -t ${IMAGE_NAME}:${IMAGE_TAG} \
-                            --build-arg BUILD_NUMBER=${IMAGE_TAG} \
-                            --no-cache .
-                            docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
-                        """
-                    } catch (Exception e) {
-                        error "Failed to build Docker image: ${e.getMessage()}"
-                    }
-                }
+                sh """
+                    docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} .
+                    docker tag ${env.IMAGE_NAME}:${env.IMAGE_TAG} ${env.IMAGE_NAME}:latest
+                """
             }
         }
 
         stage('Push to DockerHub') {
             steps {
-                script {
-                    try {
-                        withCredentials([usernamePassword(
-                            credentialsId: 'dockerhub-credentials',
-                            usernameVariable: 'DOCKER_USER',
-                            passwordVariable: 'DOCKER_PASS'
-                        )]) {
-                            sh """
-                                echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
-                                docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                                docker push ${IMAGE_NAME}:latest
-                            """
-                        }
-                    } catch (Exception e) {
-                        error "Failed to push Docker image: ${e.getMessage()}"
-                    }
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo \${DOCKER_PASS} | docker login -u \${DOCKER_USER} --password-stdin
+                        docker push ${env.IMAGE_NAME}:${env.IMAGE_TAG}
+                        docker push ${env.IMAGE_NAME}:latest
+                    """
                 }
             }
         }
 
         stage('Deploy') {
             steps {
-                script {
-                    try {
-                        sh """
-                            docker stop ${APP_NAME} || true
-                            docker rm ${APP_NAME} || true
-                            docker run -d \
-                                --name ${APP_NAME} \
-                                -p 8000:8000 \
-                                --restart unless-stopped \
-                                ${IMAGE_NAME}:${IMAGE_TAG}
-                        """
-                    } catch (Exception e) {
-                        error "Failed to deploy: ${e.getMessage()}"
-                    }
-                }
+                sh """
+                    docker stop ${env.APP_NAME} || true
+                    docker rm ${env.APP_NAME} || true
+                    docker run -d \
+                        --name ${env.APP_NAME} \
+                        -p 8000:8000 \
+                        --restart unless-stopped \
+                        ${env.IMAGE_NAME}:${env.IMAGE_TAG}
+                """
             }
         }
     }
 
     post {
         always {
-            script {
-                try {
-                    // Cleanup
-                    sh """
-                        docker logout || true
-                        docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
-                        docker rmi ${IMAGE_NAME}:latest || true
-                        docker system prune -f || true
-                    """
-                } catch (Exception e) {
-                    echo "Cleanup failed: ${e.getMessage()}"
-                }
+            node('built-in') {
+                sh """
+                    docker logout || true
+                    docker rmi ${env.IMAGE_NAME}:${env.IMAGE_TAG} || true
+                    docker rmi ${env.IMAGE_NAME}:latest || true
+                    docker system prune -f || true
+                """
                 cleanWs()
             }
         }
