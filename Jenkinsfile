@@ -2,11 +2,12 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_CREDENTIALS = credentials('dockerhub-credentials')
-        DOCKER_IMAGE = 'devopscoacht/fastapi-app'
-        DOCKER_TAG = "${env.BUILD_NUMBER}"
-        GIT_REPO = 'https://github.com/devopscoacht/jenkins-project1.git'
-        GIT_BRANCH = 'master'
+        // Define all environment variables at pipeline level
+        APP_NAME = 'fastapi-app'
+        DOCKERHUB_USERNAME = 'devopscoacht'
+        IMAGE_NAME = "${DOCKERHUB_USERNAME}/${APP_NAME}"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
     }
 
     options {
@@ -20,8 +21,7 @@ pipeline {
             steps {
                 script {
                     cleanWs()
-                    git branch: "${GIT_BRANCH}",
-                        url: "${GIT_REPO}"
+                    checkout scm
                 }
             }
         }
@@ -29,36 +29,37 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Login to DockerHub
-                    withCredentials([usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )]) {
+                    try {
                         sh """
-                            docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD}
-                            docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} \
-                                --build-arg BUILD_NUMBER=${DOCKER_TAG} \
-                                --no-cache .
-                            docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+                            docker build -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                            --build-arg BUILD_NUMBER=${IMAGE_TAG} \
+                            --no-cache .
+                            docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
                         """
+                    } catch (Exception e) {
+                        error "Failed to build Docker image: ${e.getMessage()}"
                     }
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push to DockerHub') {
             steps {
                 script {
-                    withCredentials([usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )]) {
-                        sh """
-                            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-                            docker push ${DOCKER_IMAGE}:latest
-                        """
+                    try {
+                        withCredentials([usernamePassword(
+                            credentialsId: 'dockerhub-credentials',
+                            usernameVariable: 'DOCKER_USER',
+                            passwordVariable: 'DOCKER_PASS'
+                        )]) {
+                            sh """
+                                echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+                                docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                                docker push ${IMAGE_NAME}:latest
+                            """
+                        }
+                    } catch (Exception e) {
+                        error "Failed to push Docker image: ${e.getMessage()}"
                     }
                 }
             }
@@ -67,15 +68,19 @@ pipeline {
         stage('Deploy') {
             steps {
                 script {
-                    sh """
-                        docker stop fastapi-app || true
-                        docker rm fastapi-app || true
-                        docker run -d \
-                            --name fastapi-app \
-                            -p 8000:8000 \
-                            --restart unless-stopped \
-                            ${DOCKER_IMAGE}:${DOCKER_TAG}
-                    """
+                    try {
+                        sh """
+                            docker stop ${APP_NAME} || true
+                            docker rm ${APP_NAME} || true
+                            docker run -d \
+                                --name ${APP_NAME} \
+                                -p 8000:8000 \
+                                --restart unless-stopped \
+                                ${IMAGE_NAME}:${IMAGE_TAG}
+                        """
+                    } catch (Exception e) {
+                        error "Failed to deploy: ${e.getMessage()}"
+                    }
                 }
             }
         }
@@ -84,12 +89,17 @@ pipeline {
     post {
         always {
             script {
-                // Cleanup
-                sh """
-                    docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true
-                    docker rmi ${DOCKER_IMAGE}:latest || true
-                    docker system prune -f || true
-                """
+                try {
+                    // Cleanup
+                    sh """
+                        docker logout || true
+                        docker rmi ${IMAGE_NAME}:${IMAGE_TAG} || true
+                        docker rmi ${IMAGE_NAME}:latest || true
+                        docker system prune -f || true
+                    """
+                } catch (Exception e) {
+                    echo "Cleanup failed: ${e.getMessage()}"
+                }
                 cleanWs()
             }
         }
