@@ -12,14 +12,19 @@ pipeline {
                 git url: 'https://github.com/devopscoacht/jenkins-project1.git', branch: 'master'
             }
         }
-
         stage('Build Docker Image') {
-            steps {
-                script {
-                    dockerImage = docker.build("${DOCKER_IMAGE}:${env.BUILD_NUMBER}")
-                }
-            }
+    agent {
+        docker {
+            image 'docker:stable-dind'
+            args '--privileged -v /var/run/docker.sock:/var/run/docker.sock'
         }
+    }
+    steps {
+        script {
+            dockerImage = docker.build("${DOCKER_IMAGE}:${env.BUILD_NUMBER}")
+        }
+    }
+}
 
         stage('Push Docker Image') {
             steps {
