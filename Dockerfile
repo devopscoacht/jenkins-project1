@@ -1,13 +1,16 @@
-FROM python:3.9-slim
 
-WORKDIR /app
+FROM python:3.9
 
-COPY requirements.txt .
+WORKDIR /src
 
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . /src
 
-COPY ./app  /app/app
+RUN pip install flask
 
-EXPOSE  80
+RUN pip install flask_restful
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
+EXPOSE 3333
+
+ENTRYPOINT ["python"]
+
+CMD ["./src/helloworld.py"]
