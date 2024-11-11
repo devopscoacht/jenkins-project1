@@ -61,10 +61,7 @@ pipeline {
 
     post {
         always {
-            node {
-                label('master')  // Add this line
-                cleanWs()
-            }
+            cleanWs()
         }
         failure {
             error("Pipeline failed! Sending notifications...")
