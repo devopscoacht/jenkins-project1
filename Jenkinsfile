@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_REPO = 'devopscoacht/jenkins-project'
+        DOCKER_HUB_REPO = 'devopscoacht/jenkins-project'      
         DOCKER_REGISTRY = 'https://registry.hub.docker.com'
         // Using Jenkins credentials for Docker Hub
         DOCKER_CREDENTIALS = credentials('dockerhub_credentials')
