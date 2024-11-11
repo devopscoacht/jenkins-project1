@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_HUB_REPO = 'devopscoacht/jenkins-project'      
+        DOCKER_HUB_REPO = 'devopscoacht/jenkins-project'     
         DOCKER_REGISTRY = 'https://registry.hub.docker.com'
         DOCKER_CREDENTIALS = credentials('dockerhub_credentials')
     }
@@ -62,6 +62,7 @@ pipeline {
     post {
         always {
             node {
+                label('master')  // Add this line
                 cleanWs()
             }
         }
