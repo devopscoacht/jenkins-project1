@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         // Replace with your Docker Hub username
-        registryCredential = 'dockerhub_credentials'
+        registryCredentials = 'dockerhub_credentials'
         dockerImage        = ''
     }
 
