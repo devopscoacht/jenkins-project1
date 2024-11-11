@@ -2,34 +2,38 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        DOCKERHUB_REPO = 'devopscoacht/jenkins-project'
-        IMAGE_TAG = "${env.BUILD_ID}"
+        // Replace with your Docker Hub username
+        registryCredential = 'dockerhub_credentials'
+        dockerImage        = ''
     }
 
     stages {
-        stage('Clone Repository') {
+        stage('Checkout') {
             steps {
-                git url: 'https://github.com/devopscoacht/jenkins-project1.git', branch: 'master', credentialsId: 'github-credentials'
+                git branch: 'master', url: 'https://github.com/devopscoacht/jenkins-project1.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    def app = docker.build("${DOCKERHUB_REPO}:${IMAGE_TAG}")
+                    dockerImage = docker.build("devopscoacht/jenkins-project:${env.BUILD_NUMBER}")
                 }
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push to Docker Registry') {
             steps {
                 script {
-                    docker.withRegistry('', 'dockerhub-credentials') {
-                        def app = docker.image("${DOCKERHUB_REPO}:${IMAGE_TAG}")
-                        app.push()
+                    docker.withRegistry('', 'registryCredentials') {
+                        dockerImage.push()
                     }
                 }
+            }
+        }
+        stage('Cleanup') {
+            steps {
+                sh "docker rmi devopscoacht/jenkins-project:${env.BUILD_NUMBER}"
             }
         }
     }
