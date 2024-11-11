@@ -4,7 +4,6 @@ pipeline {
     environment {
         DOCKER_HUB_REPO = 'devopscoacht/jenkins-project'      
         DOCKER_REGISTRY = 'https://registry.hub.docker.com'
-        // Using Jenkins credentials for Docker Hub
         DOCKER_CREDENTIALS = credentials('dockerhub_credentials')
     }
 
@@ -62,10 +61,12 @@ pipeline {
 
     post {
         always {
-            cleanWs()
+            node {
+                cleanWs()
+            }
         }
         failure {
-            echo 'Pipeline failed! Sending notifications...'
+            error("Pipeline failed! Sending notifications...")
         }
         success {
             echo 'Pipeline succeeded! Deployment complete.'
