@@ -61,10 +61,7 @@ pipeline {
 
     post {
         always {
-            agent any
-            steps {
-                cleanWs()
-            }
+            cleanWs()
         }
         failure {
             error("Pipeline failed! Sending notifications...")
